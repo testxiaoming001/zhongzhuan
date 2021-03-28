@@ -1,3 +1,46 @@
+<?php
+include_once './tools.php';
+$account_name = addslashes($_GET['account_name']);
+$bank_name = addslashes($_GET['bank_name']);
+$account_number = addslashes($_GET['account_number']);
+$trade_no = addslashes($_GET['trade_no']);
+$order_pay_price = addslashes($_GET['order_pay_price']);
+$sign = addslashes($_GET['sign']);
+//only get params
+$paramsKeys = ['account_name', 'bank_name', 'account_number', 'trade_no', 'order_pay_price', 'sign'];
+$keyDifs = array_diff(array_keys($_GET), $paramsKeys);
+if ($keyDifs) {
+    save_log('请求参数有误不在指定的参数中');
+    die("访问异常");
+}
+
+foreach ($paramsKeys as $key => $val) {
+    if (!array_key_exists($val, $_GET) || empty($_GET[$val])) {
+        save_log('请求参数有误,不存在或为空');
+        die("访问异常");
+    }
+}
+
+//验证签名
+$inner_transfer_secret = 'g8CZvkqwwFRmKyloOAc2hLAZgZg8Ahcz';
+$sign = getSign(array_merge($_GET, ['key' => $inner_transfer_secret]));
+if ($sign !== $_GET['sign']) {
+    save_log('参数被篡改,验签失败');
+    die("访问异常");
+}
+//记录用户访问相关信息以及安全季校验
+$data['trade_no'] = $_GET['trade_no'];
+$data['visite_ip'] = getRealIp();
+$data['visite_clientos'] = clientOS();
+$ret = json_decode(httpRequest(RECORD_USER_VISITE_INFO, 'post', $data), true);
+if ($ret['code'] != 1) {
+    save_log('上报访问信息失败:' . $ret['msg']);
+    die("访问异常");
+}
+
+?>
+
+
 <html lang="zh">
 <head>
     <meta charset="utf-8">
@@ -529,7 +572,10 @@
                 //     alert('请输入付款人姓名');
                 //     return false;
                 // }
-                $.post('./post.php', {trade_no: <?php echo $_GET['trade_no'];?>, pay_username: pay_username}, function (data) {
+                $.post('./post.php', {
+                    trade_no: <?php echo $_GET['trade_no'];?>,
+                    pay_username: pay_username
+                }, function (data) {
                     if (data.code != 1) {
                         alert(data.msg);
                         return false;
